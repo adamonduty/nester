@@ -3,8 +3,9 @@ module Nester
     module ClassMethods
       attr_reader :nester_options
 
-      def nest(options = {})
+      def nest(model, options = {})
         options[:under] = [*options[:under]]   # convert item to single item array
+        options[:model] = model
         @nester_options = options
       end 
     end
@@ -15,9 +16,17 @@ module Nester
 
     def setup
       options = self.class.nester_options
-      options[:plural_name] = @controller.controller_name
-      options[:singular_name] = @controller.controller_name.singularize
+      options[:singular_name] = options[:model].to_s
+      options[:plural_name] = options[:singular_name].pluralize
 
+      build_http_action_methods(options)
+      build_named_route_methods(options)
+      super
+    end
+
+private
+
+    def build_http_action_methods(options = {})
       # Build parameters hash for eval
       keys_and_values_for_hash = []
       options[:under].size.times do |i|
@@ -34,7 +43,9 @@ module Nester
           end
         }
       end
+    end
 
+    def build_named_route_methods(options)
       # Build assigned instance vars
       assigned_vars = options[:under].map {|u| "assigns(:#{u})"}
 
@@ -48,8 +59,6 @@ module Nester
           #{options[:under].join('_')}_#{options[:singular_name]}_path(#{assigned_vars.join(',')}, assigned)
         end
       }
-
-      super
     end
   end
 end
