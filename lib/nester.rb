@@ -3,6 +3,7 @@ module Nester
     module ClassMethods
       def nest(model, options = {})
         options[:under] = [*options[:under]]   # convert item to single item array
+        options[:namespace] = [*options[:namespace]]
         options[:model] = model
 
         options[:singular_name] = options[:model].to_s
@@ -48,15 +49,16 @@ private
       def build_named_route_methods(options)
         # Build assigned instance vars
         assigned_vars = options[:under].map {|u| "assigns(:#{u})"}
+        assigned_vars_with_assigned = assigned_vars.dup << 'assigned'
 
         # Build named route methods
         class_eval %Q{
           def #{options[:plural_name]}_path
-            #{options[:under].join('_')}_#{options[:plural_name]}_path(#{assigned_vars.join(',')})
+            #{(options[:namespace] + options[:under]).join('_')}_#{options[:plural_name]}_path(#{assigned_vars.join(',')})
           end
 
           def #{options[:singular_name]}_path(assigned)
-            #{options[:under].join('_')}_#{options[:singular_name]}_path(#{assigned_vars.join(',')}, assigned)
+            #{(options[:namespace] + options[:under]).join('_')}_#{options[:singular_name]}_path(#{assigned_vars_with_assigned.join(',')})
           end
         }
       end
