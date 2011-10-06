@@ -11,6 +11,7 @@ module Nester
 
         build_http_action_methods(options)
         build_named_route_methods(options)
+        build_namespaced_controller_class(options)
       end 
 
 private
@@ -62,6 +63,19 @@ private
           end
         }
       end
+
+      # Build a namespaced controller class that ensures
+      # ActionController::TestCase#get and similar methods generate
+      # namespaced routes
+      def build_namespaced_controller_class(options)
+        # subclass the existing controller
+        class_name = options[:namespace].map{|namespace| namespace.to_s.capitalize.constantize}.push(controller_class).join('::')
+        class_eval %Q{
+          class #{class_name} < #{controller_class}; end
+        }
+
+        tests class_name.constantize
+      end
     end
 
     def self.included(base)
@@ -73,6 +87,7 @@ private
     module ClassMethods
       def nest(model, options = {})
         options[:under] = [*options[:under]]   # convert item to single item array
+        options[:namespace] = [*options[:namespace]]
         options[:model] = model
 
         options[:singular_name] = options[:model].to_s
@@ -83,20 +98,24 @@ private
 
 private
       def build_named_route_methods(options = {})
-        method_chain = []
+        namespace_chain = options[:namespace].map {|namespace| ":#{namespace}"}
+
+        # Build method chains anchored off argument to _path methods
+        method_chain = namespace_chain.dup
         options[:under].size.times do |i|
           chain = options[:under].reverse[0..i]
           method_chain.unshift "#{options[:singular_name]}.#{chain.join('.')}"
         end
 
-        method_chain_with_anchor = []
+        # Build method chains anchored off assumed instance variable
+        method_chain_with_anchor = namespace_chain.dup
         anchor = "@#{options[:under].last}"
         options[:under].size.times do |i|
           chain = options[:under].reverse[1..i]
           method_chain_with_anchor.unshift (anchor + chain.map{|c| ".#{c}"}.join)
         end
 
-        # Build name routes
+        # Build named routes
         class_eval %Q{ 
           def edit_#{options[:singular_name]}_path(#{options[:singular_name]}, options = {})
             edit_polymorphic_path([#{method_chain.join(', ')}, #{options[:singular_name]}], options)
