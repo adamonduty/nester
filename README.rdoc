@@ -1,0 +1,118 @@
+= nester
+
+Nester is a Rails gem that helps you nest your routes. Given config/routes.rb:
+
+  resources :blogs
+  resources :posts
+  resources :comments
+
+At first, this seems like a perfectly reasonable approach. Blogs, posts,
+and comments are all accessed via their database `id` field. Eventually you
+decide that is ugly and bad for SEO, so you write a #to_param method and base
+URLs off the blog name and post title. That will look much better! You also
+decide that you should now nest your resources, just in case two people from
+different blogs create posts with the same title. It could happen!
+
+  resources :blogs do
+    resources :posts do
+      resources :comments
+    end
+  end
+
+You refresh the page and realize that your application is completely broken!
+
+Nesting routes changes all of the generated route helpers in your views, tests,
+and controllers. Depending on the complexity of your application, you may have
+minutes or hours changing routes, rerunning tests, etc. And you're really out
+of luck if you have no tests at all.
+
+== Fix Your Helpers
+
+Nester solves this problem by generating additional route helpers that act
+like the non-nested routes, but generate nested routes for you. You get to keep
+the nice routes with little to no modification of your application, but still
+have the benefits of fully nested URLs.
+
+To use nester, add a couple of lines to your helpers:
+
+  module ApplicationHelper
+    include Nester::Helper
+    nest :post, :under => :blog
+    nest :comment, :under => [:blog, :post]
+  end
+
+Now your views and controllers will have new named routes:
+
+  post_path(post)
+  edit_post_path(post)
+  posts_path()
+  new_post_path()
+  
+  comment_path(comment)
+  edit_comment_path(comment)
+  comments_path()
+  new_comment_path()
+
+Upon use, each route expands to something like
+
+  blog_post_path(post, post.blog)
+  blog_post_comment_path(comment.post.blog, comment.post, comment)
+
+For plural and new paths, no argument is passed that can act as an anchor. By
+convention, nester uses the last provided option to :under. This is equivalent
+to the following:
+
+  blog_posts_path(@blog)
+  blog_post_comments_path(@post.blog, @post)
+
+Future versions of nester will provide the ability to specify the instance
+variable name of the anchor. For what its worth, this approach is compatible
+with the belongs_to and nested_belongs_to options in InheritedResources.
+
+== Fix Your Tests
+
+If you are using ActionController::TestCase for your functional tests, nester
+provides similar functionality to generate methods for your named
+routes. nester assumes that you have generated a fresh functional test for
+the CommentsController. Simply add two lines:
+
+  class CommentsControllerTest < ActionController::TestCase
+    include Nester::TestCase
+    nest :comment, :under => [:blog, :post]
+  end
+
+Methods will be generated as they were in your views. Additionally, the
+ActionController::TestCase methods #get, #post, #head, and #delete will be
+modified to add references to :blog_id and :post_id in the
+parameters hash. This makes your functional tests work fresh from the generator -
+no modifications required.
+
+== Options
+
+Nester has two main options:
+
+:under describes the chain of nested resources. It can be a single item or an
+array of symbols.
+
+:namespace acts like :under, but for namespaces. Useful if you decide you want
+to namespace a resource under admin or similar.
+
+== Example Application
+
+An example application showing nester usage is available at
+https://github.com/adamonduty/nester-testapp.
+
+nester was tested with Rails 3.1. If you have problems, please open an issue on
+github.
+
+== Copyright
+
+Copyright © 2011 Adam Lamar.
+
+nester is licensed under the AGPLv3. You may use nester without modification
+as a dependency of your application without requiring source code disclosure.
+However, if you modify nester and place the dependent software on a public
+facing network server (i.e. website), please publish your modifications to
+nester by forking the github project.
+
+See LICENSE.txt for further details.
