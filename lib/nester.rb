@@ -101,19 +101,21 @@ private
         namespace_chain = options[:namespace].map {|namespace| ":#{namespace}"}
 
         # Build method chains anchored off argument to _path methods
-        method_chain = namespace_chain.dup
+        method_chain = []
         options[:under].size.times do |i|
           chain = options[:under].reverse[0..i]
           method_chain.unshift "#{options[:singular_name]}.#{chain.join('.')}"
         end
+        method_chain = namespace_chain + method_chain
 
         # Build method chains anchored off assumed instance variable
-        method_chain_with_anchor = namespace_chain.dup
+        method_chain_with_anchor = []
         anchor = "@#{options[:under].last}"
         options[:under].size.times do |i|
           chain = options[:under].reverse[1..i]
           method_chain_with_anchor.unshift (anchor + chain.map{|c| ".#{c}"}.join)
         end
+        method_chain_with_anchor = namespace_chain + method_chain_with_anchor
 
         # Build named routes
         class_eval %Q{ 
